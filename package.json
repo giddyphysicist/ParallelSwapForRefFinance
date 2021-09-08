@@ -1,0 +1,49 @@
+{
+  "name": "near-vue-tailwind",
+  "version": "0.1.1",
+  "description": "NEAR Protocol starter kit including Vue 3 & tailwind 2, enabling easy setup for a blockchain dApp",
+  "author": "trevorjtclarke",
+  "scripts": {
+    "dev": "vite --open",
+    "build": "cross-env NODE_ENV=production vite build",
+    "prestart": "npm run contract:build && npm run contract:dev:deploy",
+    "contract:build": "node ./contract/build",
+    "contract:dev:deploy": "near dev-deploy --wasmFile ./contract/res/dummy_contract.wasm",
+    "contract:deploy": "near deploy --wasmFile ./contract/res/dummy_contract.wasm",
+    "contract:test": "cd contract && cargo test --package status-message -- --nocapture"
+  },
+  "keywords": [
+    "NEAR",
+    "NEAR Protocol",
+    "NEAR",
+    "Blockchain",
+    "NEAR Blockchain",
+    "Vue",
+    "Vuejs",
+    "Vue 3",
+    "Tailwind"
+  ],
+  "dependencies": {
+    "@headlessui/vue": "^1.4.1",
+    "@heroicons/vue": "^1.0.4",
+    "vue": "^3.0.4",
+    "vue-axios": "^3.2.1",
+    "vue-near": "^0.1.1",
+    "vue-router": "^4.0.1",
+    "vuex": "^4.0.0-rc.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/aspect-ratio": "^0.2.0",
+    "@tailwindcss/forms": "^0.2.1",
+    "@tailwindcss/typography": "^0.3.1",
+    "@vitejs/plugin-vue": "^1.0.4",
+    "@vue/compiler-sfc": "^3.0.5",
+    "autoprefixer": "^9.8.6",
+    "cross-env": "^7.0.3",
+    "near-api-js": "^0.36.2",
+    "postcss": "^7.0.35",
+    "shelljs": "^0.8.4",
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.0.2",
+    "vite": "^2.0.0-beta.8"
+  }
+}
