@@ -80,3 +80,8 @@ I made use of the excellent template from the following source as the first iter
 
 - [https://github.com/TrevorJTClarke/near-vue-tailwind](https://github.com/TrevorJTClarke/near-vue-tailwind)
 
+### Donate
+
+Like this repo and material? Consider donating Eth!
+
+0x2263B05F52e30b84416EF4C6a060E966645Cc66e
