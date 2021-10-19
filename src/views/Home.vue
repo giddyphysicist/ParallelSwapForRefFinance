@@ -1,6 +1,5 @@
 
 
-
 <template>
   <main>
     <div class="z-0 relative overflow-hidden bg-gray-100 dark:bg-gray-700">
@@ -216,7 +215,8 @@ import { ref } from 'vue'
 import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { CheckIcon, SelectorIcon } from '@heroicons/vue/solid'
 //import { Decimal } from 'decimal.js'
-
+import Big from 'big.js';
+Big.DP = 40;
 var tokens = [
   {
     id: 1,
@@ -581,7 +581,7 @@ state.inputAmount = el.value;
 
 	calculate_dx_float(mu, pool) {
         let p = pool;
-        p['gamma_bps'] = 10000 - p.total_fee;
+        p['gamma_bps'] = new Big(10000).minus(p.total_fee);
         if (p.token_account_ids[0] === state.inputToken) {
             p['x'] = p.amounts[0];
             p['y'] = p.amounts[1]; 
@@ -589,15 +589,23 @@ state.inputAmount = el.value;
             p['x'] = p.amounts[1];
             p['y'] = p.amounts[0];
         }
-		let radical = Number(p.x) * Number(p.y) / Number(p.gamma_bps);
-		return mu * 100 * Math.sqrt(radical) - Number(p.x) * 10000 / Number(p.gamma_bps);
+		let radical = new Big(p.x).times(p.y).div(p.gamma_bps);
+    // console.log('radical is...',radical)
+    // console.log('radical sqrt is...',radical.sqrt())
+    // console.log('mu is ...',mu.toString())
+    let dxFloat = new Big(mu).times(100).times(radical.sqrt()).minus(new Big(p.x).times(10000).div(p.gamma_bps));
+    // console.log('dxFloat is...',dxFloat.toString(),' for pool ',pool)
+		return dxFloat
     },
 
 
     
 	calculate_dy_float(dx_float,pool) {
+      if (dx_float <= 0) {
+        return new Big(0);
+      } 
         let p = pool;
-        p['gamma_bps'] = 10000 - p.total_fee;
+        p['gamma_bps'] = new Big(10000).minus(p.total_fee);
         if (p.token_account_ids[0] === state.inputToken) {
             p['x'] = p.amounts[0];
             p['y'] = p.amounts[1]; 
@@ -605,18 +613,23 @@ state.inputAmount = el.value;
             p['x'] = p.amounts[1];
             p['y'] = p.amounts[0];
         }
-		let dx = Number(dx_float);
-		return (Number(p.y) * dx * Number(p.gamma_bps)) / (10000 * Number(p.x) + Number(p.gamma_bps) * dx);
+		let dx = new Big(dx_float);
+    // console.log('dx is...',dx.toString());
+    let denom = new Big(10000).times(p.x).plus(new Big(p.gamma_bps).times(dx));
+    let numerator = new Big(p.y).times(dx).times(p.gamma_bps);
+    let dyFloat = numerator.div(denom).round();
+		return dyFloat;
 	},
 
 
     solveForMuFloat(pools, totalDeltaX) {
-        if (pools.length > 0){
-            let numerator = Number(totalDeltaX);
-            let denominator = 0;
+      // console.log('pools in solving for mu are...',pools);
+         if (pools.length > 0){
+            let numerator = new Big(totalDeltaX);
+            let denominator = new Big(0);
             for (var i=0; i < pools.length; i++) {
                 let p = pools[i];
-                p['gamma_bps'] = 10000 - p.total_fee;
+                p['gamma_bps'] = new Big(10000).minus(p.total_fee);
                 if (p.token_account_ids[0] === state.inputToken) {
                     p['x'] = p.amounts[0];
                     p['y'] = p.amounts[1]; 
@@ -624,30 +637,34 @@ state.inputAmount = el.value;
                     p['x'] = p.amounts[1];
                     p['y'] = p.amounts[0];
                 }
-
-                numerator += Number(p.x) * 10000 / Number(p.gamma_bps);
-                // denominator += isqrt(p.x_i * p.y_i * p.gamma_bps / 10000n) * 10000n / p.gamma_bps;
-                denominator += Math.sqrt(Number(p.x) * Number(p.y) * Number(p.gamma_bps)) * 100 / Number(p.gamma_bps);
+   
+                let numAdd = new Big(p.x).times(10000).div(p.gamma_bps);
+                numerator = numerator.plus(numAdd);
+                let denomAdd = new Big(p.x).times(p.y).div(p.gamma_bps).sqrt().times(100);
+                // let denomAdd = new Big(new Big(p.x).times(p.y).times(p.gamma_bps)).sqrt().times(100).div(p.gamma_bps);
+                denominator = denominator.plus(denomAdd);
             }
-            const mu = numerator / denominator;
-            //console.log(1, mu);
+
+            const mu = new Big(numerator).div(denominator);
         return mu;	
         }
         else {
             const mu = NaN;
-            //console.log(2, mu);
         return mu;	
         }
     },
 
     getAllocationsAndOutputs(totalInput, filteredPoolStructList) {
         // let totalInput = BigInt(totalInput);
-        let algPools = filteredPoolStructList; // 
+        let algPools = filteredPoolStructList;
         let allocations = this.calculateOptimalOutput(algPools, totalInput);
         let dyReturns = [];
         for (var i=0; i<algPools.length;i++) {
             let ap = algPools[i];
-            let dyReturn = Math.round(this.calculate_dy_float(allocations[i],ap));
+            let allocNow = allocations[i];
+            console.log(i,':looping and found allocation to be...',allocNow);
+            let dyReturn = new Big(this.calculate_dy_float(allocNow,ap)).round();
+            console.log('dyReturn is...',dyReturn,' for dx input allocation...',allocNow)
             dyReturns.push(dyReturn);
         }
         return {allocations:allocations, outputs: dyReturns};
@@ -656,10 +673,7 @@ state.inputAmount = el.value;
     
  calculateOptimalOutput(pools,inputAmount) {
 	// This runs the main optimization algorithm using the input
-
 	// console.log('input amount is... ',inputAmount)
-
-
 	//let mu = solveForMu(pools, inputAmount);
 	let mu = this.solveForMuFloat(pools, inputAmount);
 	// console.log('mu is ... ', mu)
@@ -673,20 +687,22 @@ state.inputAmount = el.value;
 			// console.log('found a negative dx value!')
 			negativeDxValsFlag = true;
 		}
-		dxArray.push(Math.round(dx));
+        let dxInt = new Big(dx).round()
+		dxArray.push(dxInt);
 	}
 	// console.log("dx array", dxArray);
 	if (negativeDxValsFlag) {
 		  dxArray = this.reducePools(pools, dxArray);
 	}
 	//Render Pools in table
-	let dxArraySum = 0;
+	let dxArraySum = new Big(0);
 	for (var i=0; i<dxArray.length; i++) {
-		dxArraySum += dxArray[i];
+		dxArraySum = dxArraySum.plus(dxArray[i]);
 	}
 	let normalizedDxArray = [];
 	for (var i=0; i<dxArray.length; i++) {
-		normalizedDxArray.push(Math.round(dxArray[i]*inputAmount/dxArraySum));
+        let ndx = new Big(dxArray[i]).times(inputAmount).div(dxArraySum).round()
+		normalizedDxArray.push(BigInt(ndx.toFixed()));
 	}
 	// console.log('final dxArray is... ',normalizedDxArray)
 	return normalizedDxArray
@@ -734,36 +750,37 @@ state.inputAmount = el.value;
 
   async getBestOutput() {
 // This runs the main optimization algorithm using the inputs in the state
-
 // console.log("GLOBAL ALL POOLS VARIABLE IS... ",allPoolsGlobal)
 let filteredPoolStructList = state.filteredPoolStructList;
 // console.log("state is currently... ",state)
 // console.log("filteredPoolStructList is...", filteredPoolStructList)
 // console.log("currentContract is",currentContract)
-
-
  let totalInput = state.inputAmount;
  let result = this.getAllocationsAndOutputs(totalInput, filteredPoolStructList);
 //let result = {allocations: ["1000000000000000000000","1000000000000000000000"]}
 let allocationPercentages = [];
-let totalAllocationInt = 0n;
+// let totalAllocationInt = 0n;
+// for (var i=0; i<result.allocations.length;i++) {
+//   totalAllocationInt += BigInt(result.allocations[i]);
+// }
+let totalAllocationInt = Big(0);
+console.log('allocations are...',result.allocations)
 for (var i=0; i<result.allocations.length;i++) {
-  totalAllocationInt += BigInt(result.allocations[i]);
+  totalAllocationInt = totalAllocationInt.plus(result.allocations[i]);
 }
 for (var i=0; i<result.allocations.length;i++) {
-  let percentage = 100n * BigInt(result.allocations[i]) / totalAllocationInt;
+  let percentage = new Big(100).times(result.allocations[i]).div(totalAllocationInt).round();
   let percentageString = String(percentage) + String('%')
   allocationPercentages.push(percentageString);
-
 }
-
 let dyOutVec = [];
 // console.log("about to loop and get answers")
-
+console.log('result is...',result)
 for (var i=0; i<result.outputs.length; i++) {
-  dyOutVec.push(BigInt(result.outputs[i]));
+  //dyOutVec.push(BigInt(result.outputs[i]));
+  dyOutVec.push(result.outputs[i].round().toFixed())
 }
-
+console.log('dyOutVec is...',dyOutVec);
 // for (var i=0; i<filteredPoolStructList.length; i++) {
 //     let fps = filteredPoolStructList[i];
 //     let allocation = result.allocations[i];
@@ -776,9 +793,7 @@ for (var i=0; i<result.outputs.length; i++) {
 //     dyOutVec.push(amountOut);
 //     //let allocationPercentage = BigInt(allocation) * 100n / BigInt(totalInput);
 //     // console.log("amount out calculated to be... ",amountOut)
-
 // }
-
 //let outputAmount = dyOutVec;
 let totalDy = 0n;
 for (var i=0; i<dyOutVec.length; i++) {
@@ -786,7 +801,6 @@ for (var i=0; i<dyOutVec.length; i++) {
 }
 //await currentContract.contract.get_return({"pool_id":11,"token_in":"wrap.testnet","amount_in":"1000000000000000000000","token_out":"banana.ft-fin.testnet"})
 // console.log("amount out calculated to be... ",totalDy)
-
 this.updateFilteredPoolStructList(result.allocations,allocationPercentages);
 this.displayFilteredPoolsAsTable();
 // Run optimization function on filtered pool list
@@ -796,7 +810,6 @@ this.displayFilteredPoolsAsTable();
 // re-render table with updated filtered pool structs
 return {outputAmount: String(totalDy)};
 //Render Pools in table
-
 },
 
 

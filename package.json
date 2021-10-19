@@ -26,6 +26,7 @@
   "dependencies": {
     "@headlessui/vue": "^1.4.1",
     "@heroicons/vue": "^1.0.4",
+    "big.js": "^6.1.1",
     "vue": "^3.0.4",
     "vue-axios": "^3.2.1",
     "vue-near": "^0.1.1",
